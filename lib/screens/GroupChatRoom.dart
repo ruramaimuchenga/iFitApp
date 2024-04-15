@@ -1,10 +1,14 @@
+
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class GroupChatRoom extends StatefulWidget {
   final String chatRoomId;
+  final String chatRoomTitle;
 
-  const GroupChatRoom({Key? key, required this.chatRoomId, required String chatRoomTitle}) : super(key: key);
+  const GroupChatRoom({Key? key, required this.chatRoomId, required this.chatRoomTitle}) : super(key: key);
 
   @override
   _GroupChatRoomState createState() => _GroupChatRoomState();
@@ -18,7 +22,7 @@ class _GroupChatRoomState extends State<GroupChatRoom> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Chat Room'),
+        title: Text(widget.chatRoomTitle),
       ),
       body: Column(
         children: [
@@ -40,7 +44,7 @@ class _GroupChatRoomState extends State<GroupChatRoom> {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
                 final List<QueryDocumentSnapshot> documents = snapshot.data!.docs;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
+                WidgetsBinding.instance!.addPostFrameCallback((_) {
                   _scrollController.animateTo(
                     _scrollController.position.maxScrollExtent,
                     duration: const Duration(milliseconds: 300),
@@ -97,7 +101,7 @@ class _GroupChatRoomState extends State<GroupChatRoom> {
                   onPressed: () {
                     final message = _messageController.text.trim();
                     if (message.isNotEmpty) {
-                      // Send message logic here
+                      sendMessage(message);
                       _messageController.clear();
                     }
                   },
@@ -108,6 +112,20 @@ class _GroupChatRoomState extends State<GroupChatRoom> {
         ],
       ),
     );
+  }
+
+  void sendMessage(String message) {
+    FirebaseFirestore.instance
+        .collection('Gyms')
+        .doc('iFit Studio')
+        .collection('chatroom')
+        .doc(widget.chatRoomId)
+        .collection('messages')
+        .add({
+      'text': message,
+      'sender': FirebaseAuth.instance.currentUser?.uid,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
   }
 
   @override
@@ -133,7 +151,7 @@ class MessageBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            sender,
+            sender == FirebaseAuth.instance.currentUser?.uid ? 'You' : 'User',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
             ),

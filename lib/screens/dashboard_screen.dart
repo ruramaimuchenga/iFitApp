@@ -98,7 +98,7 @@ class DashboardScreen extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const GroupChatRoom(
+                      builder: (context) => GroupChatRoom(
                         chatRoomId: 'JjU7eCLofKEZVoODoBUT',
                         chatRoomTitle: 'iFit Studio Chat Room',
                       ),
@@ -176,3 +176,4 @@ class DashboardScreen extends StatelessWidget {
     }
   }
 }
+
