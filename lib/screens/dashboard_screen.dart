@@ -1,48 +1,18 @@
+
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_signin/reusable_widgets/reusable_widget.dart';
-import 'package:firebase_signin/screens/equipment_availability_page.dart';
-import 'package:firebase_signin/screens/progress.dart';
-import 'package:firebase_signin/screens/workout_plan.dart';
-
-import 'package:firebase_signin/screens/membership.dart';
+import '../reusable_widgets/reusable_widget.dart';
+import 'GroupChatRoom.dart';
+import 'equipment_availability_page.dart';
+import 'membership.dart';
+import 'progress.dart';
+import 'workout_plan.dart';
 
 class DashboardScreen extends StatelessWidget {
   final String email;
 
   const DashboardScreen({Key? key, required this.email}) : super(key: key);
-
-  Future<String> getGym(String email) async {
-    var gymName = '';
-    CollectionReference users = FirebaseFirestore.instance.collection('Users');
-    var doc = await users.doc(email).get();
-    if (doc.exists) {
-      Map<String, dynamic> map = doc.data() as Map<String, dynamic>;
-      if (map.containsKey('membership')) {
-        gymName = map['membership']['gym'];
-      }
-    }
-    return gymName;
-  }
-
-  void checkString(BuildContext context, Future<String> futureValue) async {
-    String value = await futureValue;
-    if (value.isEmpty) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => Membership(email: email),
-        ),
-      );
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => EquipmentAvailabilityPage(gym: value),
-        ),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +32,6 @@ class DashboardScreen extends StatelessWidget {
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: SingleChildScrollView(
-          // Wrap the Column with SingleChildScrollView
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -118,7 +87,6 @@ class DashboardScreen extends StatelessWidget {
                 title: "Gym Equipment Availability",
                 onTap: () {
                   var gymName = getGym(email);
-                  // Check if the string is empty
                   checkString(context, gymName);
                 },
               ),
@@ -127,19 +95,27 @@ class DashboardScreen extends StatelessWidget {
                 icon: Icons.chat,
                 title: "Chat Room",
                 onTap: () {
-                  // Handle onTap action
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const GroupChatRoom(
+                        chatRoomId: 'JjU7eCLofKEZVoODoBUT',
+                        chatRoomTitle: 'iFit Studio Chat Room',
+                      ),
+                    ),
+                  );
                 },
               ),
               const SizedBox(height: 20),
               buildCard(
                 icon: Icons.add_circle_outline,
-                title: "Add workout Details",
+                title: "Add Workout Details",
                 onTap: () {},
               ),
               const SizedBox(height: 20),
               buildCard(
                 icon: Icons.bluetooth,
-                title: "Go into Watch mode",
+                title: "Go into Watch Mode",
                 onTap: () {},
               ),
             ],
@@ -165,6 +141,38 @@ class DashboardScreen extends StatelessWidget {
     } catch (e) {
       print('Error retrieving user field: $e');
       return null;
+    }
+  }
+
+  Future<String> getGym(String email) async {
+    var gymName = '';
+    CollectionReference users = FirebaseFirestore.instance.collection('Users');
+    var doc = await users.doc(email).get();
+    if (doc.exists) {
+      Map<String, dynamic> map = doc.data() as Map<String, dynamic>;
+      if (map.containsKey('membership')) {
+        gymName = map['membership']['gym'];
+      }
+    }
+    return gymName;
+  }
+
+  void checkString(BuildContext context, Future<String> futureValue) async {
+    String value = await futureValue;
+    if (value.isEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Membership(email: email),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EquipmentAvailabilityPage(gym: value),
+        ),
+      );
     }
   }
 }
