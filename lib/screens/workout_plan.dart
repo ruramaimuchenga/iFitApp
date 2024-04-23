@@ -1,14 +1,14 @@
 
+
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../reusable_widgets/reusable_widget.dart';
-import 'generate_form.dart';
-
+import 'package:firebase_signin/screens/generate_form.dart';
 
 class WorkoutPlanPage extends StatelessWidget {
   final String email;
 
-  const WorkoutPlanPage({Key? key, required this.email}) : super(key: key);
+  const WorkoutPlanPage({required this.email, Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -18,11 +18,11 @@ class WorkoutPlanPage extends StatelessWidget {
         centerTitle: true,
       ),
       body: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            buildCard(
+            _buildCard(
               icon: Icons.auto_awesome,
               title: "Generate New Plan",
               onTap: () {
@@ -42,21 +42,11 @@ class WorkoutPlanPage extends StatelessWidget {
                     .doc(email)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: const CircularProgressIndicator(),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return const Center(
-                      child: Text('Error loading workout plan'),
-                    );
-                  }
-
                   if (snapshot.hasData) {
-                    var userData = snapshot.data?.data() as Map<String, dynamic>?;
-                    if (userData != null && userData.containsKey('workout_plan')) {
+                    var userData = snapshot.data!.data();
+                    if (userData != null &&
+                        userData is Map<String, dynamic> &&
+                        userData.containsKey('workout_plan')) {
                       var workoutPlan = userData['workout_plan'] as List<dynamic>;
                       return ListView.builder(
                         itemCount: workoutPlan.length,
@@ -74,9 +64,8 @@ class WorkoutPlanPage extends StatelessWidget {
                       );
                     }
                   }
-
                   return const Center(
-                    child: Text('No data found'),
+                    child: CircularProgressIndicator(),
                   );
                 },
               ),
@@ -90,15 +79,31 @@ class WorkoutPlanPage extends StatelessWidget {
         },
         label: const Text('Add New Exercise'),
         icon: const Icon(Icons.add),
-        tooltip: 'Add New Exercise',
+      ),
+    );
+  }
+
+  Widget _buildCard({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Card(
+        elevation: 4,
+        child: ListTile(
+          leading: Icon(icon),
+          title: Text(title),
+        ),
       ),
     );
   }
 
   void _showAddExerciseDialog(BuildContext context) {
-    final TextEditingController exerciseController = TextEditingController();
-    final TextEditingController timeController = TextEditingController();
-    final TextEditingController repsController = TextEditingController();
+    String? selectedExercise;
+    TextEditingController timeController = TextEditingController();
+    TextEditingController repsController = TextEditingController();
 
     showDialog(
       context: context,
@@ -108,9 +113,26 @@ class WorkoutPlanPage extends StatelessWidget {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: exerciseController,
-                decoration: const InputDecoration(labelText: 'Exercise Name'),
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('equipment').snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    var exerciseList = snapshot.data!.docs.map((doc) => doc['name'] as String).toList();
+                    return DropdownButton<String>(
+                      hint: const Text('Choose Exercise'),
+                      value: selectedExercise,
+                      onChanged: (value) {
+                        selectedExercise = value;
+                      },
+                      items: exerciseList.map((exercise) => DropdownMenuItem<String>(
+                          value: exercise,
+                          child: Text(exercise),
+                      )).toList(),
+                    );
+                  } else {
+                    return const CircularProgressIndicator();
+                  }
+                },
               ),
               TextField(
                 controller: timeController,
@@ -124,7 +146,7 @@ class WorkoutPlanPage extends StatelessWidget {
               ),
             ],
           ),
-          actions: <Widget>[
+          actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
@@ -133,31 +155,29 @@ class WorkoutPlanPage extends StatelessWidget {
             ),
             ElevatedButton(
               onPressed: () {
-                // Validate inputs
-                String exerciseName = exerciseController.text;
-                int? time = int.tryParse(timeController.text);
-                int? reps = int.tryParse(repsController.text);
-
-                if (exerciseName.isEmpty || time == null || reps == null) {
+                if (selectedExercise == null) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text("Please provide valid input."),
-                    ),
+                    const SnackBar(content: Text("Please select an exercise")),
                   );
                   return;
                 }
 
-                // Add new exercise to Firestore
+                String timeText = timeController.text;
+                String repsText = repsController.text;
+
+                int time = int.tryParse(timeText) ?? 0;
+                int reps = int.tryParse(repsText) ?? 0;
+
                 FirebaseFirestore.instance
                     .collection('Users')
                     .doc(email)
                     .update({
                       'workout_plan': FieldValue.arrayUnion([
                         {
-                          'name': exerciseName,
+                          'name': selectedExercise,
                           'time': time,
                           'reps': reps,
-                        },
+                        }
                       ]),
                     });
 
@@ -171,18 +191,6 @@ class WorkoutPlanPage extends StatelessWidget {
     );
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 class WorkoutPlanTile extends StatelessWidget {
   final String email;
@@ -200,16 +208,16 @@ class WorkoutPlanTile extends StatelessWidget {
     final int time = exercise['time'] ?? 0;
     final int reps = exercise['reps'] ?? 0;
 
-    return Card( // Use a Card to create a subtle border and shadow
-      elevation: 2, // Light shadow for aesthetic appeal
-      margin: const EdgeInsets.symmetric(vertical: 5), // Add space between tiles
-      child: Padding( // Padding to make the content less cramped
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 5),
+      child: Padding(
         padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Corrected property name
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   name,
@@ -218,24 +226,24 @@ class WorkoutPlanTile extends StatelessWidget {
                     fontSize: 16,
                   ),
                 ),
-                IconButton( // Delete button
+                IconButton(
                   icon: const Icon(Icons.delete, size: 20),
-                  onPressed: () => _confirmDelete(context), // Call the delete confirmation dialog
+                  onPressed: () => _deleteExercise(context),
                 ),
               ],
             ),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Corrected property name
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Time: $time mins'),
-                Row( // Container for plus/minus buttons
+                Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.remove, size: 20), // Smaller icon
+                      icon: const Icon(Icons.remove, size: 20),
                       onPressed: () => _updateField(context, 'time', time - 1),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.add, size: 20), // Smaller icon
+                      icon: const Icon(Icons.add, size: 20),
                       onPressed: () => _updateField(context, 'time', time + 1),
                     ),
                   ],
@@ -243,7 +251,7 @@ class WorkoutPlanTile extends StatelessWidget {
               ],
             ),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween, // Corrected property name
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Reps: ${reps == 0 ? "" : reps}'),
                 Row(
@@ -266,45 +274,29 @@ class WorkoutPlanTile extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Delete Exercise'),
-          content: const Text('Are you sure you want to delete this exercise?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(), // Cancel the deletion
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => _deleteExercise(context), // Delete if confirmed
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   void _deleteExercise(BuildContext context) {
     final DocumentReference userDoc = FirebaseFirestore.instance
         .collection('Users')
         .doc(email);
 
     userDoc.update({
-      'workout_plan': FieldValue.arrayRemove([exercise]), // Remove the exercise
+      'workout_plan': FieldValue.arrayRemove([exercise]),
     }).then((_) {
-      Navigator.of(context).pop(); // Close the dialog after successful deletion
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Exercise deleted')),
+      );
+    }).catchError((error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete failed: $error')),
+      );
     });
   }
 
   void _updateField(BuildContext context, String field, int newValue) {
     if (newValue < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$field cannot be negative'),
+        const SnackBar(
+          content: Text('Values cannot be negative'),
         ),
       );
       return;
@@ -314,36 +306,32 @@ class WorkoutPlanTile extends StatelessWidget {
         .collection('Users')
         .doc(email);
 
-    userDoc.update({
-      'workout_plan': FieldValue.arrayRemove([exercise]),
-    }).then((_) {
-      exercise[field] = newValue;
+    userDoc.get().then((doc) {
+      if (doc.exists) {
+        var workoutPlan = doc['workout_plan'] as List;
 
-      userDoc.update({
-        'workout_plan': FieldValue.arrayUnion([exercise]),
-      });
+        int index = workoutPlan.indexOf(exercise);
+
+        if (index >= 0) {
+          workoutPlan[index][field] = newValue;
+
+          userDoc.update({
+            'workout_plan': workoutPlan,
+          }).then((_) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Updated successfully')),
+            );
+          }).catchError((error) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Update failed: $error')),
+            );
+          });
+        }
+      }
+    }).catchError((error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching document: $error')),
+      );
     });
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
